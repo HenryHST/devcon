@@ -1,4 +1,4 @@
-FROM ubuntu:jammy
+FROM ubuntu:noble
 
 LABEL ubuntu.version="22.04.4" \
       name="ubuntu_base" \

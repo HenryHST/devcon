@@ -144,14 +144,14 @@ jobs:
       # Upload Trivy SARIF for GitHub Code Scanning (Security tab)
       - name: Upload Trivy SARIF (main)
         if: always() && hashFiles('trivy-main.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-main.sarif'
           category: 'trivy-image'
 
       - name: Upload Trivy SARIF (OpenTofu)
         if: always() && hashFiles('trivy-opentofu.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-opentofu.sarif'
           category: 'trivy-image-opentofu'

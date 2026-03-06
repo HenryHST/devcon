@@ -65,9 +65,7 @@ plugins=(
   yarn
   web-search
   jsontools
-  macports
   node
-  osx
   sudo
   docker
 )
@@ -140,8 +138,5 @@ POWERLEVEL9K_VCS_MODIFIED_BACKGROUND='red'
 POWERLEVEL9K_PROMPT_ADD_NEWLINE=true
 
 
-# Colorise the top Tabs of Iterm2 with the same color as background
-# Just change the 18/26/33 wich are the rgb values
-echo -e "\033]6;1;bg;red;brightness;18\a"
-echo -e "\033]6;1;bg;green;brightness;26\a"
-echo -e "\033]6;1;bg;blue;brightness;33\a"
+# iTerm2 tab color (only when running in iTerm2)
+[[ "${TERM_PROGRAM}" = "iTerm.app" ]] && echo -e "\033]6;1;bg;red;brightness;18\a\033]6;1;bg;green;brightness;26\a\033]6;1;bg;blue;brightness;33\a"

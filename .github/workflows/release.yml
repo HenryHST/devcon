@@ -1,0 +1,67 @@
+# Release pipeline: creates a GitHub Release when a version tag (v*.*.*) is pushed.
+# Docker images for this version are built and pushed by the Docker workflow (docker-publish.yml).
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write  # create release and upload assets
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for release notes
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_clean=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          body: |
+            ## Container images
+
+            Images are built and pushed to GHCR by the [Docker workflow](https://github.com/${{ github.repository }}/actions/workflows/docker-publish.yml).
+
+            | Image | Tag |
+            |-------|-----|
+            | Default (Terraform) | `ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}` |
+            | OpenTofu variant | `ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}-opentofu` |
+
+            ### Pull and run
+
+            **Default:**
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            docker run -it --rm --hostname devcon -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            ```
+
+            **OpenTofu:**
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}-opentofu
+            docker run -it --rm --hostname devcon -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}-opentofu
+            ```
+
+            ### Verify signature (Cosign)
+
+            ```bash
+            cosign verify ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            cosign verify ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}-opentofu
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

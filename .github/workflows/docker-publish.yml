@@ -29,6 +29,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write  # for Trivy SARIF upload (Code Scanning)
       # This is used to complete the identity challenge
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
@@ -43,7 +44,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
         with:
-          cosign-release: 'v2.2.4'
+          cosign-release: 'v2.4.1'
 
       # Set up BuildKit Docker container builder to be able to build
       # multi-platform images and export cache
@@ -69,18 +70,91 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      # Build and push Docker image with Buildx (don't push on PR)
-      # https://github.com/docker/build-push-action
+      - name: Extract Docker metadata (OpenTofu variant)
+        id: meta-opentofu
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            suffix=-opentofu
+
+      # On PR we build only linux/amd64 and load for Trivy; on push we build both platforms.
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            IMAGE_SOURCE=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build and push Docker image (OpenTofu)
+        id: build-and-push-opentofu
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: ./Dockerfile.opentofu
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: ${{ steps.meta-opentofu.outputs.tags }}
+          labels: ${{ steps.meta-opentofu.outputs.labels }}
+          build-args: |
+            IMAGE_SOURCE=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Resolve first image tag for Trivy (same ref used for load on PR)
+      - name: Get image refs for Trivy
+        id: image-refs
+        run: |
+          MAIN_REF=$(printf '%s' '${{ steps.meta.outputs.tags }}' | head -n 1)
+          OPENTOFU_REF=$(printf '%s' '${{ steps.meta-opentofu.outputs.tags }}' | head -n 1)
+          echo "main_ref=${MAIN_REF}" >> $GITHUB_OUTPUT
+          echo "opentofu_ref=${OPENTOFU_REF}" >> $GITHUB_OUTPUT
+
+      # Trivy security scan – default image
+      - name: Trivy scan (default image)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image-refs.outputs.main_ref }}
+          format: 'sarif'
+          output: 'trivy-main.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # Trivy security scan – OpenTofu image
+      - name: Trivy scan (OpenTofu image)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.image-refs.outputs.opentofu_ref }}
+          format: 'sarif'
+          output: 'trivy-opentofu.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          ignore-unfixed: true
+
+      # Upload Trivy SARIF for GitHub Code Scanning (Security tab)
+      - name: Upload Trivy SARIF (main)
+        if: always() && hashFiles('trivy-main.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-main.sarif'
+          category: 'trivy-image'
+
+      - name: Upload Trivy SARIF (OpenTofu)
+        if: always() && hashFiles('trivy-opentofu.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-opentofu.sarif'
+          category: 'trivy-image-opentofu'
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
@@ -95,4 +169,11 @@ jobs:
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+      - name: Sign the published Docker image (OpenTofu)
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          TAGS: ${{ steps.meta-opentofu.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push-opentofu.outputs.digest }}
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}

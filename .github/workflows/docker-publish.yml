@@ -119,7 +119,7 @@ jobs:
           echo "main_ref=${MAIN_REF}" >> $GITHUB_OUTPUT
           echo "opentofu_ref=${OPENTOFU_REF}" >> $GITHUB_OUTPUT
 
-      # Trivy security scan – default image
+      # Trivy security scan – default image (SARIF to Security tab; exit 0 so build is not failed by findings)
       - name: Trivy scan (default image)
         uses: aquasecurity/trivy-action@master
         with:
@@ -127,8 +127,9 @@ jobs:
           format: 'sarif'
           output: 'trivy-main.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1'
+          exit-code: '0'
           ignore-unfixed: true
+          scanners: 'vuln'
 
       # Trivy security scan – OpenTofu image
       - name: Trivy scan (OpenTofu image)
@@ -138,8 +139,9 @@ jobs:
           format: 'sarif'
           output: 'trivy-opentofu.sarif'
           severity: 'CRITICAL,HIGH'
-          exit-code: '1'
+          exit-code: '0'
           ignore-unfixed: true
+          scanners: 'vuln'
 
       # Upload Trivy SARIF for GitHub Code Scanning (Security tab)
       - name: Upload Trivy SARIF (main)

@@ -2,6 +2,13 @@
 
 As a rule of thumb, I never install any packages directly onto my Mac unless I absolutely have to. So I created this sample development container that I use with Docker for Mac to be my sole dev environment. There is a breakdown in the Dockerfile of which tools are installed.
 
+### Dokumentation
+
+Ausführliche Beschreibung von Architektur, Pipelines und Entwicklung: **[docs/](docs/README.md)**  
+– [Architektur](docs/architecture.md) (Aufbau, Komponenten, Varianten, Multi-Arch)  
+– [Pipelines](docs/pipelines.md) (Docker-Workflow, Release-Workflow)  
+– [Entwicklung](docs/development.md) (lokaler Build, Versionen, Renovate)
+
 ### Build pipeline (CI/CD)
 
 The GitHub Actions workflow in [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml) runs on push to `main`, on pull requests targeting `main`, and on version tags `v*.*.*`. It does the following:
@@ -12,6 +19,8 @@ The GitHub Actions workflow in [.github/workflows/docker-publish.yml](.github/wo
 2. **Push** – Pushes images to GHCR (`ghcr.io`) only when not a pull request. Tags include `latest`, `latest-opentofu`, and (on tags) semver.
 3. **Trivy** – Runs [Trivy](https://github.com/aquasecurity/trivy) against both images for vulnerability scanning. The job fails on **CRITICAL** or **HIGH** issues (unfixed vulnerabilities are ignored). SARIF results are uploaded to GitHub Code Scanning so findings appear under the repository’s **Security** tab.
 4. **Signing** – After push, images are signed with [Cosign](https://docs.sigstore.dev/cosign/overview/) (Sigstore). Signatures use OIDC and the public Rekor transparency log (for public repos).
+
+Ausführliche Pipeline-Beschreibung und Ablaufdiagramm: [docs/pipelines.md](docs/pipelines.md).
 
 To build and sign images yourself, use the same Dockerfiles and optionally verify with:
 

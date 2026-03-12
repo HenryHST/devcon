@@ -2,5 +2,36 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ]
+  ],
+  "schedule": ["before 6am on the first day of the month"],
+  "timezone": "Europe/Berlin",
+  "labels": ["dependencies"],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  },
+  "packageRules": [
+    {
+      "description": "Group all GitHub Actions updates into one PR",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Group Dockerfile base image and Docker-related updates",
+      "matchManagers": ["dockerfile", "docker"],
+      "groupName": "Docker"
+    },
+    {
+      "description": "Use separate PRs for major version bumps of actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "groupName": null
+    }
+  ],
+  "dockerfile": {
+    "enabled": true
+  },
+  "docker": {
+    "enabled": true
+  }
 }

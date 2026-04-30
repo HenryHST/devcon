@@ -1,4 +1,4 @@
-FROM ubuntu:noble
+FROM ubuntu:resolute
 
 # Multi-arch: set by Docker Buildx when building for amd64 or arm64
 ARG TARGETARCH
